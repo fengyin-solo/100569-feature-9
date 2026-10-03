@@ -63,6 +63,44 @@
       </tbody>
     </table>
 
+    <div class="panel reconcile-panel">
+      <div class="panel-head">
+        <span class="panel-title">巡检分册待核对清单</span>
+        <span class="panel-hint">站点巡检按整改期限出的分册包会落到这里，抄表侧核对后从清单移除。</span>
+      </div>
+      <table v-if="pendingPackages.length" class="data-table">
+        <thead>
+          <tr>
+            <th>分册包编号</th>
+            <th>片区/班组</th>
+            <th>核定负责人</th>
+            <th>期限区间</th>
+            <th>分册数</th>
+            <th>待整改问题</th>
+            <th>出包时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="pkg in pendingPackages" :key="pkg.id">
+            <td>{{ pkg.packageNo }}</td>
+            <td>{{ pkg.area }} / {{ pkg.crew }}</td>
+            <td>{{ pkg.manager }}</td>
+            <td>{{ pkg.rangeStart }} 至 {{ pkg.rangeEnd }}</td>
+            <td>{{ pkg.files.length }}</td>
+            <td>{{ pkg.issueCount }}</td>
+            <td>{{ pkg.createdAt }}</td>
+            <td class="row-actions">
+              <button class="link" type="button" @click="downloadPackageFile(pkg.id)">下载分册包</button>
+              <button class="link" type="button" @click="confirmCheck(pkg.id)">核对通过</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="empty-state">暂无待核对的巡检分册包</p>
+      <span v-if="reconcileMessage" class="ok-text">{{ reconcileMessage }}</span>
+    </div>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条热计量抄表记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -79,7 +117,12 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
-import type { EntryRow } from '@/data/types'
+import {
+  checkPatrolPackage,
+  downloadPackage,
+  listPendingMeterChecks,
+} from '@/api/patrol-package'
+import type { EntryRow, PatrolPackageRecord } from '@/data/types'
 
 const meta = moduleMeta('heatmeter')
 const columns = ["抄表编号", "计量表号", "用户名称", "累计热量", "抄表方式", "抄表日期", "结算周期", "抄表状态"]
@@ -133,5 +176,28 @@ function reload() {
   }
 }
 
-onMounted(reload)
+// 巡检分册落到抄表侧的待核对清单
+const pendingPackages = ref<PatrolPackageRecord[]>([])
+const reconcileMessage = ref('')
+
+function refreshPending() {
+  pendingPackages.value = listPendingMeterChecks()
+}
+
+function downloadPackageFile(id: number) {
+  downloadPackage(id)
+}
+
+function confirmCheck(id: number) {
+  const result = checkPatrolPackage(id)
+  reconcileMessage.value = result.message
+  if (result.ok) {
+    refreshPending()
+  }
+}
+
+onMounted(() => {
+  reload()
+  refreshPending()
+})
 </script>

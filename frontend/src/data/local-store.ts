@@ -3,6 +3,7 @@ import type { EntryRow } from './types'
 
 // 本地持久化：数据放在 localStorage 里，刷新、关掉再打开都还在。
 const STORAGE_KEY = 'district-heating:entries'
+const COLLECTION_PREFIX = 'district-heating:collection:'
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
@@ -56,4 +57,28 @@ export function resetRows(key: string): EntryRow[] {
 
 export function storageKey(): string {
   return STORAGE_KEY
+}
+
+// 独立集合：分册包记录不混进业务表，重置示例数据也不影响已出的包。
+export function listCollection<T>(key: string): T[] {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return []
+  }
+  const raw = window.localStorage.getItem(COLLECTION_PREFIX + key)
+  if (!raw) {
+    return []
+  }
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? (parsed as T[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveCollection<T>(key: string, items: T[]): void {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return
+  }
+  window.localStorage.setItem(COLLECTION_PREFIX + key, JSON.stringify(items))
 }
