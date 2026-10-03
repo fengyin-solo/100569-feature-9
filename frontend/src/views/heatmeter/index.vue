@@ -67,6 +67,58 @@
       <span>共 {{ total }} 条热计量抄表记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
+
+    <section class="review-list">
+      <header class="review-head">
+        <h3>巡检问题整改待核对清单</h3>
+        <span class="review-desc">来源：站点巡检按整改期限分册出包结果，随包落入抄表侧；待核对 {{ pendingReviews.length }} 条，已核对 {{ checkedReviews.length }} 条。</span>
+      </header>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>核对编号</th>
+            <th>来源批次</th>
+            <th>巡检编号</th>
+            <th>巡检站点</th>
+            <th>巡检路线</th>
+            <th>问题数</th>
+            <th>整改期限</th>
+            <th>期限段/区间</th>
+            <th>分册</th>
+            <th>核对状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in reviewRows" :key="item.id">
+            <td>{{ item.reviewNo }}</td>
+            <td>{{ item.batchNo }}</td>
+            <td>{{ item.patrolNo }}</td>
+            <td>{{ item.station }}</td>
+            <td>{{ item.route }}</td>
+            <td>{{ item.issueCount }}</td>
+            <td>{{ item.deadline }}</td>
+            <td>{{ item.segmentName }}<br /><span class="range-hint">{{ item.rangeLabel }}</span></td>
+            <td>第{{ item.bookletNo }}册</td>
+            <td>{{ item.status }}</td>
+            <td class="row-actions">
+              <button
+                v-if="item.status !== '已核对'"
+                class="link"
+                type="button"
+                @click="checkReview(item.id)"
+              >
+                确认核对
+              </button>
+              <span v-else class="range-hint">已随 {{ item.batchNo }} 登记</span>
+            </td>
+          </tr>
+          <tr v-if="!reviewRows.length">
+            <td colspan="11" class="empty-state">巡检分册尚未出包，暂无待核对条目；重复提交出包不会重复登记</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
   </section>
 </template>
 
@@ -79,7 +131,8 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
-import type { EntryRow } from '@/data/types'
+import { confirmPatrolReview, listPatrolReviews } from '@/api/patrol-pack'
+import type { EntryRow, PatrolReviewItem } from '@/data/types'
 
 const meta = moduleMeta('heatmeter')
 const columns = ["抄表编号", "计量表号", "用户名称", "累计热量", "抄表方式", "抄表日期", "结算周期", "抄表状态"]
@@ -133,5 +186,48 @@ function reload() {
   }
 }
 
-onMounted(reload)
+// 巡检分册结果落到抄表侧的待核对清单：按入册时间倒序展示。
+const reviewRows = ref<PatrolReviewItem[]>([])
+const pendingReviews = computed(() => reviewRows.value.filter((item) => item.status !== '已核对'))
+const checkedReviews = computed(() => reviewRows.value.filter((item) => item.status === '已核对'))
+
+function reloadReviews() {
+  reviewRows.value = listPatrolReviews().sort((a, b) => b.createdAt - a.createdAt || b.id - a.id)
+}
+
+function checkReview(id: number) {
+  const result = confirmPatrolReview(id)
+  if (!result.ok) {
+    errorMessage.value = result.message
+    return
+  }
+  errorMessage.value = ''
+  reloadReviews()
+}
+
+onMounted(() => {
+  reload()
+  reloadReviews()
+})
 </script>
+
+<style scoped>
+.review-list {
+  margin-top: 18px;
+}
+.review-head {
+  margin-bottom: 8px;
+}
+.review-head h3 {
+  font-size: 15px;
+  margin: 0 0 4px;
+}
+.review-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+.range-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+</style>

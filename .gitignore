@@ -85,3 +85,6 @@ desktop.ini
 *.db
 *.pid
 *.seed
+
+# 冒烟测试打包临时产物
+scripts/.smoke-patrol.mjs
